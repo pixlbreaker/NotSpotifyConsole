@@ -9,6 +9,8 @@
 
   <ItemGroup>
     <PackageReference Include="Google.Apis.YouTube.v3" Version="1.69.0.3680" />
+    <PackageReference Include="MediaToolkit" Version="1.1.0.1" />
+    <PackageReference Include="VideoLibrary" Version="3.2.8" />
   </ItemGroup>
 
 </Project>
