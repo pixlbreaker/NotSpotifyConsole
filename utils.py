@@ -1,24 +1,30 @@
 import os
-import pytube
-import pytube.innertube
-from yt_dlp import YoutubeDL
+import pytubefix
 
-class Utils():
 
-    def __init__(self):
-        pass
+def downloadYoutubeAudio(video_url, path):
+    '''Downloads youtube audio'''
+    try:
+        yt = pytubefix.YouTube(video_url)
+        title = yt.title
+        output = yt.streams.get_audio_only()
+        output.download(filename=f"{title}.mp3", output_path=path)
+        print(f'Downloaded {title}')
+    except:
+        print('Unable to download file')
 
-    def downloadYouTube(videourl, path):
-        '''Downloads the Youtube video and puts it to the specific path'''
-        yt = pytube.YouTube(videourl)
-        yt = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
-        if not os.path.exists(path):
-            os.makedirs(path)
-        yt.download(path)
+def checkFile(video_url, path):
+    '''Checks if the file exsists'''
+    try:
+        yt = pytubefix.YouTube(video_url)
+        title = yt.title
+        file_name = path + "\\" + title +".mp3"
+        print(f'Checking: {title}')
 
-    def video_to_audio(file_name):
-        '''Converts the video file to an mp3 file using ffmpeg'''
-        file_without_ext = file_name.split['.'][0]
-        command = f"ffmpeg -i {file_name} {file_without_ext}.mp3"
-        os.system(command)
-        os.remove(file_name)
+        if os.path.exists(file_name):
+            return True
+        else:
+            return False
+    except:
+        return False
+
