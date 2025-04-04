@@ -1,61 +1,128 @@
 ﻿using MediaToolkit;
 using MediaToolkit.Model;
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Net.Http;
 using VideoLibrary;
-using YoutubeExplode;
-using YoutubeExplode.Converter;
-using YoutubeExplode.Videos.Streams;
 
 namespace NotSpotify
 {
-    public class Program
+    internal class Program
     {
-        string youtubePlaylistURL = "";
-
-        public static void Main(string[] args)
+        private static void Main(string[] args)
         {
-            Console.WriteLine("YouTube API Playlist Download");
-            Console.WriteLine("==================================");
+            var exportPath = @"C:\Users\Michael\Documents\Projects\CSharpProjects\NotSpotifyConsole\NotSpotify\bin\Debug\net8.0\Videos";
 
-            DownloadVideo("this");
+            Console.WriteLine("Playlist URL: ");
+            var playlistUrl = Console.ReadLine();
 
-            //string path = Directory.GetCurrentDirectory() + "\\Videos\\";
-            //SaveMP3(path, "https://www.youtube.com/watch?v=AF2MqFnPotc", "bbl");
+            if (string.IsNullOrWhiteSpace(playlistUrl))
+            {
+                Console.WriteLine("Invalid URL. Exiting...");
+                return;
+            }
 
-        }
+            if (!playlistUrl.ToLower().Contains("youtube.com"))
+            {
+                Console.WriteLine("Isn't an YouTube URL. Exiting...");
+                return;
+            }
 
-        static async void DownloadVideo(string id)
-        {
-            var youtube = new YoutubeClient();
-            var videoUrl = "https://www.youtube.com/watch?v=AF2MqFnPotc";
+            if (!playlistUrl.ToLower().Contains("playlist?list="))
+            {
+                Console.WriteLine("Ins't an YouTube Playlist. Exiting...");
+                return;
+            }
 
-            //string path = Directory.GetCurrentDirectory() + "\\Videos\\" + "video.mp4";
-            //await youtube.Videos.DownloadAsync(videoUrl, "video.mp4");
+            var pathPlaylist = playlistUrl
+                .Replace("https", "")
+                .Replace("http", "")
+                .Replace("://", "")
+                .Replace("www.", "")
+                .Replace("youtube.com/", "").Trim();
 
-            var streamManifest = await youtube.Videos.
-            var streamInfo = streamManifest.GetAudioOnlyStreams().GetWithHighestBitrate();
+            var client = new HttpClient();
+            client.BaseAddress = new Uri("https://www.youtube.com");
+            var result = client.GetAsync(pathPlaylist).Result;
+            var conteudo = result.Content.ReadAsStringAsync().Result;
+            var links = ExtrairLinksPlaylist(conteudo);
 
-            // Get the actual stream
-            var stream = await youtube.Videos.Streams.GetAsync(streamInfo);
+            if (links.Count == 0)
+            {
+                Console.WriteLine("None video found in the playlist. Exiting...");
+                return;
+            }
 
-            // Download the stream to a file
-            await youtube.Videos.Streams.DownloadAsync(streamInfo, $"video.{streamInfo.Container}");
-        }
+            var titulo = ExtrairTitulo(conteudo);
+            var baseDir = $@"{exportPath}\{titulo}\";
+            if (!Directory.Exists(baseDir))
+            {
+                Directory.CreateDirectory(baseDir);
+            }
 
-        private static void SaveMP3(string SaveToFolder, string VideoURL, string MP3Name)
-        {
-            var source = @SaveToFolder;
             var youtube = YouTube.Default;
-            var vid = youtube.GetVideo(VideoURL);
-            File.WriteAllBytes(source + vid.FullName, vid.GetBytes());
+            var engine = new Engine();
 
-            var inputFile = new MediaFile { Filename = source + vid.FullName };
-            var outputFile = new MediaFile { Filename = $"{MP3Name}.mp3" };
+            var i = 1;
+            foreach (var linkVideo in links)
+            {
+                var vid = youtube.GetVideo(linkVideo);
 
-            Engine engine = new Engine();
-            engine.GetMetadata(inputFile);
-            engine.Convert(inputFile, outputFile);
+                Console.WriteLine($"{i}) " + vid.FullName);
+                if (File.Exists(baseDir + vid.FullName))
+                {
+                    Console.WriteLine(" - File already exists. Skipping...");
+                    continue;
+                }
+
+                File.WriteAllBytes(baseDir + vid.FullName, vid.GetBytes());
+                var inputFile = new MediaFile { Filename = baseDir + vid.FullName };
+                var outputFile = new MediaFile { Filename = $"{baseDir + vid.FullName}.mp3" };
+                engine.GetMetadata(inputFile);
+                engine.Convert(inputFile, outputFile);
+                i++;
+            }
+
+            engine.Dispose();
+        }
+
+        private static string ExtrairTitulo(string conteudo)
+        {
+            try
+            {
+                var t = "<title>";
+                var ini = conteudo.IndexOf(t) + t.Length;
+                var fim = conteudo.IndexOf("</title>");
+                var titulo = conteudo.Substring(ini, fim - ini);
+                titulo = titulo.EndsWith(" - YouTube") ? titulo.Remove(titulo.LastIndexOf(" - YouTube")) : titulo;
+                return titulo.Trim();
+            }
+            catch (Exception)
+            {
+                return "Youtube";
+            }
+        }
+
+        private static List<string> ExtrairLinksPlaylist(string html)
+        {
+            var linksPlaylist = new List<string>();
+
+            var w = "/watch?v=";
+            var padraoLink = $"<a class=\"pl-video-title-link yt-uix-tile-link yt-uix-sessionlink  spf-link \" dir=\"ltr\" href=\"{w}";
+            var idx = html.IndexOf(padraoLink, 0);
+
+            while (idx > -1)
+            {
+                var idxInicioLink = idx + padraoLink.Length - w.Length;
+                var idxFimLink = html.IndexOf("&", idxInicioLink);
+                var pedacoLink = html.Substring(idxInicioLink, idxFimLink - idxInicioLink);
+                linksPlaylist.Add(pedacoLink);
+
+                idx = html.IndexOf(padraoLink, idxFimLink);
+            }
+
+            return linksPlaylist;
         }
     }
 }
